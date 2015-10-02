@@ -125,6 +125,17 @@ INT32 Usage()
 int main(int argc, char * argv[])
 {
     file = fopen("itrace.out", "w");
+
+	//debug options
+	DEBUG_MODE mode;
+	_tcpClientStruct client;
+
+	client._ip = "127.0.0.1";
+	client._tcpPort = 8888;
+
+    mode._type = DEBUG_CONNECTION_TYPE_TCP_CLIENT;
+	mode._options = DEBUG_MODE_OPTION_STOP_AT_ENTRY;
+    mode._tcpClient = client;
     
     // Initialize pin
     if (PIN_Init(argc, argv)) return Usage();
@@ -134,6 +145,8 @@ int main(int argc, char * argv[])
 
     // Register Fini to be called when the application exits
     PIN_AddFiniFunction(Fini, 0);
+
+	PIN_SetDebugMode(&mode);
     
     // Start the program, never returns
     PIN_StartProgram();
