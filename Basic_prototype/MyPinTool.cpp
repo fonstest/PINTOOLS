@@ -1,10 +1,50 @@
 #include <stdio.h>
-#include "pin.H"
 #include <stdlib.h>
+#include <iostream>
+#include <sstream>
+#include "pin.H"
+
 
 
 
 FILE * file;
+
+
+static void ConnectDebugger()
+{
+    if (PIN_GetDebugStatus() != DEBUG_STATUS_UNCONNECTED){
+		 fprintf(file, "errore  1");
+		 return;
+	}
+
+
+    DEBUG_CONNECTION_INFO info;
+    if (!PIN_GetDebugConnectionInfo(&info) || info._type != DEBUG_CONNECTION_TYPE_TCP_SERVER){
+		 fprintf(file, "error 2");
+		 return;
+	}
+
+
+    fprintf(file, "uscito");
+
+	int timeout = 30000;
+
+    if (PIN_WaitForDebuggerToConnect(timeout))
+        return;
+
+}
+
+
+static VOID DoBreakpoint(const CONTEXT *ctxt, THREADID tid)
+{
+	
+    ConnectDebugger();  // Ask the user to connect a debugger, if it is not already connected.
+
+    // Construct a string that the debugger will print when it stops.  If a debugger is
+    // not connected, no breakpoint is triggered and execution resumes immediately.
+
+    PIN_ApplicationBreakpoint(ctxt, tid, FALSE, "DEBUGGER");
+}
 
 // Pin calls this function every time a new instruction is encountered
 VOID Instruction(INS ins, VOID *v)
@@ -16,17 +56,15 @@ VOID Instruction(INS ins, VOID *v)
 	if(INS_IsBranch(ins)){
 		//get the address of the current instruction
 		ADDRINT address = INS_Address(ins);
-		//get the string rapresentation of the address
-		//string addr = StringFromAddrint(address);
-		//fprintf(file , "%s\n" , addr.c_str());
 
 		//if we reach the address of the conditional jump (discover by hand with immunity)
 		//we substitute this instruction with an uncoditional jump in order o force the execution path
-		if(address == 0x00411970){
+		//this check is triggered only after the OEP is been found
+		if(address == 0x00411a10 && detected == 1){
 			//get the jmp target address
 			ADDRINT tgt = INS_DirectBranchOrCallTargetAddress(ins);
 
-			//insert the incoditional jmp
+			//insert the uncoditional jmp
 			INS_InsertDirectJump(ins, IPOINT_BEFORE, tgt); 
 
 			//remove the conditional jmp instruction
@@ -49,8 +87,10 @@ VOID Instruction(INS ins, VOID *v)
 				// of the section of the program [ BRUTAL HEURISTIC THAT WORKS ONLY WITH 1 LAYER PACKERS ]
 				if(  address_delta >= jmp_offset){
 				   
-					fprintf(file ,"[EOP TROVATO ] -> CEIP= %08x | TEIP= %08x | OFFSET = %08x\n" ,  current_eip , target_eip , address_delta);
+					fprintf(file ,"[OEP TROVATO ] -> CEIP= %08x | TEIP= %08x | OFFSET = %08x\n" ,  current_eip , target_eip , address_delta);
 					detected = 1;
+					ConnectDebugger();
+					INS_InsertCall(ins,  IPOINT_BEFORE, (AFUNPTR)DoBreakpoint, IARG_CONST_CONTEXT, IARG_THREAD_ID, IARG_END);
 				}
 
 			}
