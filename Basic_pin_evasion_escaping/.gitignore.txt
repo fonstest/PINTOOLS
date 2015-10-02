@@ -1,0 +1,2 @@
+Basic_pin_evasion_escaping/pin_escaping_detect_parent/Debug/
+Basic_pin_evasion_escaping/pin_escaping_detect_parent/Debug/*
